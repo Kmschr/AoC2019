@@ -6,3 +6,6 @@ test.*
 
 # ignore executables
 *.exe
+
+# ignore vim temporary files
+*~

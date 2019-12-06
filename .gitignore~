@@ -1,7 +1,0 @@
-# ignore input files
-input
-
-# ignore test files
-test.*
-
-# ignore executables
