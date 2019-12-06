@@ -1,0 +1,5 @@
+# ignore input files
+input
+
+# ignore test files
+test.*
