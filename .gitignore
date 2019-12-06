@@ -3,3 +3,6 @@ input
 
 # ignore test files
 test.*
+
+# ignore executables
+*.exe
