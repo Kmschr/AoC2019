@@ -2,7 +2,7 @@
 input
 
 # ignore test files
-test.*
+*test*
 
 # ignore executables
 *.exe
