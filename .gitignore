@@ -4,6 +4,9 @@ input
 # ignore test files
 *test*
 
+# ignore output files
+*out*
+
 # ignore executables
 *.exe
 
