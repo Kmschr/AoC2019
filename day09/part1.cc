@@ -8,20 +8,24 @@
 #include <algorithm>
 using namespace std;
 
-constexpr bool DEBUG = false;
+constexpr bool DEBUG = true;
 
 void displayInstruction(int PC, string OPCODE, int MODES, vector<long long> ARGS) {
 	if (DEBUG) {
-		//cout << "0x" << hex << left << setw(4) << PC << dec;
-		cout << left << setw(4) << PC;
-		cout << setw(5) << OPCODE;
-		cout << setw(3) << right << setfill('0') << MODES << setfill(' ') << left;
-		string delim = "  ";
-		for (auto ARG : ARGS) {
-			cout << delim << ARG;
-			delim = ",";
-		}
-		cout << '\n';
+		cout << left << setw(5) << PC;
+		cout << setw(6) << OPCODE;
+		cout << setw(3) << right << setfill('0') << MODES << setfill(' ');
+        cout << "  ";
+        int n = 30;
+        for (size_t i=0; i < ARGS.size(); i++) {
+            int piece = n / 3;
+            if (i != ARGS.size()-1)
+                cout << setw(piece) << left << to_string(ARGS[i]) + ',';
+            else
+                cout << setw(piece) << left << to_string(ARGS[i]);
+        }
+        if (ARGS.size() != 3)
+            cout << setw(n - (ARGS.size() * (n/3))) << ' ';
     }
 }
 
@@ -80,16 +84,21 @@ int run(long long *MEM) {
             S2 = ARGS[1];
             D1 = ARGS[2];
 
-            if (OPCODE == 1)
-				displayInstruction(PC, "ADD", MODES, ARGS);
-            if (OPCODE == 2)
-				displayInstruction(PC, "MUL", MODES, ARGS);
-
 			// PERFORM ADD/MUL
 			if (OPCODE == 1)
 				MEM[D1] = S1 + S2;
 			if (OPCODE == 2)
 				MEM[D1] = S1 * S2;
+
+            if (DEBUG) {
+                if (OPCODE == 1)
+                    if (S2 >= 0)
+                        cout << "MEM[" << D1 << "] = " << S1 << " + " << S2 << '\n';
+                    else
+                        cout << "MEM[" << D1 << "] = " << S1 << " - " << -S2 << '\n';
+                if (OPCODE == 2)
+                    cout << "MEM[" << D1 << "] = " << S1 << " * " << S2 << '\n';
+            }
 
 			PC += 4;
 			continue;
@@ -100,14 +109,15 @@ int run(long long *MEM) {
 		    int D1 = MEM[PC+1];
 			ARGS = { D1 };
 			displayInstruction(PC, "IN", MODES, ARGS);
+            if (DEBUG)
+                cout << "MEM[" << D1 << "] = INPUT" << '\n';
 
             applyModes(MEM, ARGS, MODES, BASE, 0);
             D1 = ARGS[0];
 
-			displayInstruction(PC, "IN", MODES, ARGS);
-
 			cout << ">> ";
 			cin >> MEM[D1];
+
             
 			PC += 2;
 			continue;
@@ -118,6 +128,8 @@ int run(long long *MEM) {
 			long long S1 = MEM[PC+1];
 			ARGS = { S1 };
 			displayInstruction(PC, "OUT", MODES, ARGS);
+            if (DEBUG)
+                cout << '\n';
 
             applyModes(MEM, ARGS, MODES, BASE);
             S1 = ARGS[0];
@@ -143,15 +155,15 @@ int run(long long *MEM) {
             C1 = ARGS[0];
             A1 = ARGS[1];
 
-			if (OPCODE == 5)
-				displayInstruction(PC, "JMPT", MODES, ARGS);
-			else
-				displayInstruction(PC, "JMPF", MODES, ARGS);
-
 			if ((OPCODE == 5 && C1 != 0) || (OPCODE == 6 && C1 == 0))
 				PC = A1;
 			else
 				PC += 3;
+            
+			if (OPCODE == 5)
+			    cout << "if (" << C1 << " != 0) PC = " << A1 << '\n';
+			else
+			    cout << "if (" << C1 << " -= 0) PC = " << A1 << '\n';
 
 			continue;
 		}
@@ -165,7 +177,7 @@ int run(long long *MEM) {
 
 			if (OPCODE == 7)
 				displayInstruction(PC, "LESS", MODES, ARGS);
-			else
+			if (OPCODE == 8)
 				displayInstruction(PC, "EQL", MODES, ARGS);
 
             applyModes(MEM, ARGS, MODES, BASE, 2);
@@ -173,15 +185,15 @@ int run(long long *MEM) {
             S2 = ARGS[1];
             D1 = ARGS[2];
 
-			if (OPCODE == 7)
-				displayInstruction(PC, "LESS", MODES, ARGS);
-			else
-				displayInstruction(PC, "EQL", MODES, ARGS);
-
 			if ((OPCODE == 7 && S1 < S2) || (OPCODE == 8 && S1 == S2))
 				MEM[D1] = 1;
 			else
 				MEM[D1] = 0;
+
+			if (OPCODE == 7)
+			    cout << "if (" << S1 << " < " << S2 << ") MEM[" << D1 << "] = 1" << '\n';
+			if (OPCODE == 8)
+			    cout << "if (" << S1 << " == " << S2 << ") MEM[" << D1 << "] = 1" << '\n';
 
 			PC += 4;
 			continue;
@@ -197,9 +209,12 @@ int run(long long *MEM) {
             applyModes(MEM, ARGS, MODES, BASE);
             S1 = ARGS[0];
 
-			displayInstruction(PC, "BASE", MODES, ARGS);
-
             BASE += S1;
+
+            if (S1 >= 0)
+                cout << "BASE += " << S1 << '\n';
+            else
+                cout << "BASE -= " << -S1 << '\n';
 
             PC += 2;
             continue;
@@ -216,7 +231,7 @@ int main() {
 	ifstream in("input");
 
 	long long *mem;
-    mem = new long long[64000]();
+    mem = new long long[10000]();
 
 	string s;
     int i=0;
