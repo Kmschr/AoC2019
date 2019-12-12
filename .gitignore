@@ -6,9 +6,13 @@ input
 
 # ignore output files
 *out*
+*.png
+*.pbm
 
 # ignore executables
 *.exe
 
 # ignore vim temporary files
 *~
+
+.vscode
