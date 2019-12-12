@@ -258,8 +258,8 @@ int main() {
         ++i;
 	}
 
-	int width = 300;
-	int height = 300;
+	constexpr int width = 300;
+	constexpr int height = 300;
 
 	int hull[width][height];
 	bool painted[width][height];
