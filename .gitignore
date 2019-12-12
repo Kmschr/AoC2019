@@ -15,4 +15,10 @@ input
 # ignore vim temporary files
 *~
 
-.vscode
+# ignore VSCode settings
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
