@@ -36,8 +36,6 @@ class INTCODE {
 	}
 
 	int RUN(std::istream &IN, std::ostream &OUT) {
-		int NUM_OUT = 0;
-
 		while (PC >= 0) {
 			// DECODE INSTRUCTION
 			int OPCODE = MEM[PC] % 100;
@@ -48,6 +46,7 @@ class INTCODE {
 			// HALT
 			if (OPCODE == 99) {
 				DISPLAY_INSTRUCTION("HALT", MODES, ARGS);
+				RUNNING = false;
 				return 0;
 			}
 
@@ -86,6 +85,14 @@ class INTCODE {
 			
 			// INPUT
 			if (OPCODE == 3) {
+
+				if (INTERRUPT) {
+					INTERRUPT = false;
+					return 0;
+				} else {
+					INTERRUPT = true;
+				}
+
 				INT64 D1 = MEM[PC+1]; // DEST
 				ARGS.push_back(&D1);
 
@@ -94,9 +101,13 @@ class INTCODE {
 					std::cout << "MEM[" << D1 << "] = INPUT" << '\n';
 
 				//std::cout << ">> ";
+				std::cout << '\n';
 				IN >> MEM[D1];
+
+				//std::cout << MEM[D1] << '\n';
 				
 				PC += 2;
+				return 0;
 			}
 
 			// OUTPUT
@@ -111,12 +122,14 @@ class INTCODE {
 				// print to stdout first, then ostringstream
 				if (DEBUG)
 					std::cout << '\n' << ">> " << S1 << '\n';
-				OUT << S1;
 
+				if ((NUM_OUT+1) % 3 == 0)
+					OUT << S1 << "\n";
+				else
+					OUT << S1 << ",";
+
+				NUM_OUT++;
 				PC += 2;
-
-				if (++NUM_OUT == 2)
-					return NUM_OUT;
 			}
 
 			// JUMP
@@ -200,10 +213,21 @@ class INTCODE {
 		return 1;
 	}
 
+	void SET_MEM(INT64 INDEX, INT64 VALUE) {
+		MEM[INDEX] = VALUE;
+	}
+
+	bool IS_RUNNING() {
+		return RUNNING;
+	}
+
   private:
 	std::map<INT64, INT64> MEM; // Program Memory
 	INT64 PC = 0; // Program Counter
 	INT64 BASE = 0; // Base Address for Relative Mode
+	INT64 NUM_OUT = 0;
+	bool INTERRUPT = true;
+	bool RUNNING = true;
 
 	void DISPLAY_INSTRUCTION(std::string OPCODE, int MODES, const std::vector<INT64*> &ARGS) {
 		if (!DEBUG)
