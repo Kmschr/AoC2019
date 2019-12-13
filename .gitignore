@@ -18,3 +18,8 @@ input
 # ignore VSCode settings
 .vscode/
 .vscode/*
+
+# gtags
+GPATH
+GRTAGS
+GTAGS
