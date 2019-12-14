@@ -101,7 +101,7 @@ void part2(INTCODE game) {
 	// Create Screen Buffer
 	wchar_t *cmdScreen = new wchar_t[screenWidth*screenHeight+1];
 	HANDLE hConsole = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
-	SetConsoleActiveScreenBuffer(hConsole);
+	//SetConsoleActiveScreenBuffer(hConsole);
 	DWORD dwBytesWritten = 0;
 
 	wchar_t screen[width * height];
@@ -160,7 +160,7 @@ void part2(INTCODE game) {
 		string sscore = "SCORE: " + to_string(score);
 		for (auto i=0; i < sscore.size(); i++)
 			screen[i+10] = sscore[i];
-		WriteConsoleOutputCharacter(hConsole, cmdScreen, screenWidth*screenHeight+1, { 0,0 }, &dwBytesWritten);
+		//WriteConsoleOutputCharacter(hConsole, cmdScreen, screenWidth*screenHeight+1, { 0,0 }, &dwBytesWritten);
 	}
 
 	cout << "SCORE: " << score << '\n';

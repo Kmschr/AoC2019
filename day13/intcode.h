@@ -101,7 +101,6 @@ class INTCODE {
 					std::cout << "MEM[" << D1 << "] = INPUT" << '\n';
 
 				//std::cout << ">> ";
-				std::cout << '\n';
 				IN >> MEM[D1];
 
 				//std::cout << MEM[D1] << '\n';
