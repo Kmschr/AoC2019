@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -9,7 +10,7 @@ using namespace std;
 
 struct chemical {
 	string name;
-	size_t count;
+	int count;
 };
 
 // chemical ostream operator overload
@@ -36,21 +37,28 @@ ostream &operator<<(ostream &stream, const react &r) {
 }
 
 // splits chemical string into components
-// example: split a string "10 FUEL" into size_t 10 and string "FUEL"
+// example: split a string "10 FUEL" into int 10 and string "FUEL"
 chemical parseChemical(const string &chem) {
 	auto space = chem.find(' ', 1);
-	size_t count = stoi(chem.substr(0, space));
+	int count = stoi(chem.substr(0, space));
 	string name = chem.substr(space+1);
 
 	return chemical({ name, count });
 }
 
+bool sameSign(int x, int y) {
+	return (x >= 0) ^ (y < 0);
+}
+
 // put chemical into its own place in queue, or add to existing chemical
 void queueInsert(vector<chemical> &chemQueue, chemical toAdd) {
+	if (toAdd.count == 0)
+		return;
+
 	// if already in queue, add to count
-	for (auto &chem : chemQueue) {
-		if (chem.name == toAdd.name) {
-			chem.count += toAdd.count;
+	for (auto i=0; i < chemQueue.size(); i++) {
+		if (chemQueue[i].name == toAdd.name && sameSign(chemQueue[i].count, toAdd.count)) {
+			chemQueue[i].count += toAdd.count;
 			return;
 		}
 	}
@@ -71,16 +79,16 @@ void printQueue(vector<chemical> &chemQueue) {
 
 // do we have enough of chemical to form complete reaction
 bool stoichiometric(const react &reaction, const chemical &chem) {
-	return chem.count >= reaction.output.count;
+	return abs(chem.count) >= reaction.output.count;
 }
 
 // are any of the current reactions available stoichiometric?
-bool anyStoichiometric(vector<chemical> chemQueue, map<string, react> &reactions) {
-	for (const auto &chem : chemQueue)
-		if (stoichiometric(reactions[chem.name], chem))
-			return true;
+size_t getStoichiometric(vector<chemical> chemQueue, map<string, react> &reactions) {
+	for (auto i=0; i < chemQueue.size(); i++)
+		if (stoichiometric(reactions[chemQueue[i].name], chemQueue[i]))
+			return i;
 
-	return false;
+	return -1;
 }
 
 size_t getOreCost(map<string, react> &reactions, const string &chem) {
@@ -90,53 +98,119 @@ size_t getOreCost(map<string, react> &reactions, const string &chem) {
 	chemical startingChem = { chem, 1 };
 	chemQueue.push_back(startingChem);
 
+	vector<chemical> wasted;
+
 	auto ore = 0;
 	while (!chemQueue.empty()) {
 		//printQueue(chemQueue);
 
 		// pop chemical off of queue
-		chemical current = chemQueue.back();
-		chemQueue.pop_back();
+		auto nextChemical = getStoichiometric(chemQueue, reactions);
+		chemical curChem;
+		bool stoich = true;
 
+		if (nextChemical == -1) {
+			curChem = chemQueue.back();
+			chemQueue.pop_back();
+			stoich = false;
+		} else {
+			curChem = chemQueue[nextChemical];
+			chemQueue.erase(chemQueue.begin() + nextChemical);
+		}
+		
 		// get reaction for current chemical
-		react curReact = reactions[current.name];
+		react curReact = reactions[curChem.name];
 
 		// do different things depending on if we met conditions for a stoichiometric reaction
-		if (!stoichiometric(curReact, current)) {
-			if (anyStoichiometric(chemQueue, reactions)) {
-				// put back into queue, process later
-				queueInsert(chemQueue, current);
-			} else {
-				// have to waste some of the chemical
-				for (auto chem : curReact.inputs) {
-					//cout << chem << " => " << curReact.output << '\n';
-					if (chem.name == "ORE") {
-						ore += chem.count;
+		if (!stoich) {
+			// check if we wasted chemical when we mightve shouldnt have, and recover from that possibility
+			bool stopEarly = false;
+			for (auto i=0; i < wasted.size(); i++) {
+				if (wasted[i].name == curChem.name && sameSign(wasted[i].count, curChem.count)) {
+					// re-add wasted element to queue
+					int newCount = wasted[i].count + curChem.count;
+					chemical toAdd = { curChem.name, newCount };
+
+					cout << '\n';
+					printQueue(chemQueue);
+					//printQueue(wasted);
+					cout << "Current: " << curChem << '\n';
+					cout << "Wasted: " << wasted[i] << '\n';
+					cout << "New: " << toAdd << '\n';
+
+					// still not enough for a reaction or just as much, so dont actually re-add to queue
+					if (newCount > 0 && newCount <= curReact.output.count) {
+						cout << "Still Wasted" << '\n';
+						wasted[i].count = newCount;
+						stopEarly = true;
 						continue;
 					}
 
-					queueInsert(chemQueue, chem);
+					queueInsert(chemQueue, toAdd);
+
+					// undo by adding negative chemicals, dirty trick
+					for (auto inputChem : curReact.inputs) {
+						if (inputChem.name == "ORE") {
+							ore -= inputChem.count;
+							continue;
+						}
+
+						chemical negChem = { inputChem.name, -inputChem.count };
+						queueInsert(chemQueue, negChem);
+					}
+
+					stopEarly = true;
+
+					// remove chemical from wasted list
+					wasted.erase(wasted.begin() + i);
+					printQueue(chemQueue);
+					//printQueue(wasted);
 				}
 			}
+
+			// we might not have to waste this chemical anymore
+			if (stopEarly)
+				continue;
+
+			// have to waste some of the chemical
+			wasted.push_back(curChem);
+
+			// handle negative reactions
+			int modifier = 1;
+			if (curChem.count < 0)
+				modifier = -1;
+
+			for (auto inputChem : curReact.inputs) {
+				inputChem.count *= modifier;
+
+				if (inputChem.name == "ORE") {
+					ore += inputChem.count;
+					continue;
+				}
+
+				queueInsert(chemQueue, inputChem);
+			}
 		} else {
-			size_t newCount = current.count % curReact.output.count;
-			size_t numReactions = current.count / curReact.output.count;
+			int newCount = abs(curChem.count) - curReact.output.count;
+
+			int modifier = 1;
+			if (curChem.count < 0)
+				modifier = -1;
 
 			// add remainder back to queue
 			if (newCount != 0) {
-				chemical toAdd = { current.name, newCount };
+				chemical toAdd = { curChem.name, newCount*modifier };
 				queueInsert(chemQueue, toAdd);
 			}
 
 			// add reaction elements to queue
-			for (const auto &chem : curReact.inputs) {
-				//cout << chem.count * numReactions << " " << chem.name << " => " << current.count - newCount << " " << current.name << '\n';
-				if (chem.name == "ORE") {
-					ore += chem.count*numReactions;
+			for (const auto &inputChem : curReact.inputs) {
+				if (inputChem.name == "ORE") {
+					ore += inputChem.count*modifier;
 					continue;
 				}
 
-				chemical toAdd = { chem.name, chem.count*numReactions };
+				chemical toAdd = { inputChem.name, inputChem.count*modifier };
 				queueInsert(chemQueue, toAdd);
 			}
 		}
@@ -178,7 +252,7 @@ void part1(const string &filename) {
 }
 
 int main() {
-	part1("test");
+	part1("input");
 
 	return 0;
 }

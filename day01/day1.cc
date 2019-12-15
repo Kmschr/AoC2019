@@ -23,7 +23,7 @@ void part1(const string &filename) {
 }
 
 void part2(const string &filename) {
-	ifstream in("input");
+	ifstream in(filename);
 
 	int totalFuel = 0;
 

@@ -7,7 +7,7 @@ using namespace std;
 
 constexpr bool DEBUG = false;
 
-int run(vector<int> &MEM) {
+int RUN(vector<int> &MEM) {
 	int PC = 0;
 
 	while (PC < MEM.size()) {
@@ -82,7 +82,7 @@ int main() {
 		mem.push_back(n);
 	}
 
-	run(mem);
+	RUN(mem);
 
 	return 0;
 }

@@ -22,7 +22,7 @@ void displayInstruction(int PC, string OPCODE, int MODES, vector<int> ARGS) {
 		cout << '\n';
 }
 
-int run(vector<int> &MEM) {
+int RUN(vector<int> &MEM) {
 	int PC = 0; // PROGRAM COUNTER
 
 	while (PC < MEM.size()) {
@@ -162,7 +162,7 @@ int main() {
 		mem.push_back(n);
 	}
 
-	run(mem);
+	RUN(mem);
 
 	return 0;
 }
