@@ -1,22 +1,19 @@
+#include <unordered_map>
 #include <algorithm>
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <vector>
 #include <string>
-#include <queue>
-#include <map>
+#include <deque>
 using namespace std;
+
+typedef unsigned long long u64;
 
 struct chemical {
 	string name;
-	int count;
+	u64 count;
 };
-
-// chemical ostream operator overload
-ostream &operator<<(ostream &stream, const chemical &c) {
-	return stream << c.count << " " << c.name;
-}
 
 // reaction definition
 struct react {
@@ -24,206 +21,57 @@ struct react {
 	chemical output;
 };
 
-// reaction ostream operator overload
-ostream &operator<<(ostream &stream, const react &r) {
-	for (auto i=0; i < r.inputs.size(); i++) {
-		stream << r.inputs[i];
-		if (i != r.inputs.size()-1)
-			stream << ", ";
-	}
-
-	stream << " => " << r.output;
-	return stream;
-}
-
 // splits chemical string into components
-// example: split a string "10 FUEL" into int 10 and string "FUEL"
+// example: split a string "10 FUEL" into u64 10 and string "FUEL"
 chemical parseChemical(const string &chem) {
 	auto space = chem.find(' ', 1);
-	int count = stoi(chem.substr(0, space));
+	u64 count = stoull(chem.substr(0, space));
 	string name = chem.substr(space+1);
 
 	return chemical({ name, count });
 }
 
-bool sameSign(int x, int y) {
-	return (x >= 0) ^ (y < 0);
-}
+u64 oreCost(unordered_map<string, react> &reactions, unordered_map<string, chemical> &extraChems, u64 quantity) {
+	deque<chemical> neededChems;
+	neededChems.push_back({"FUEL", quantity});
 
-// put chemical into its own place in queue, or add to existing chemical
-void queueInsert(vector<chemical> &chemQueue, chemical toAdd) {
-	if (toAdd.count == 0)
-		return;
+	u64 oreCount = 0;
 
-	// if already in queue, add to count
-	for (auto i=0; i < chemQueue.size(); i++) {
-		if (chemQueue[i].name == toAdd.name && sameSign(chemQueue[i].count, toAdd.count)) {
-			chemQueue[i].count += toAdd.count;
-			return;
-		}
-	}
+	while (!neededChems.empty()) {
+		chemical &curChem = neededChems.front();
+		neededChems.pop_front();
 
-	chemQueue.insert(chemQueue.begin(), toAdd);
-}
-
-// print queue in order from back to front
-void printQueue(vector<chemical> &chemQueue) {
-	cout << "<";
-	for (auto i=0; i < chemQueue.size(); i++) {
-		cout << chemQueue[i];
-		if (i != chemQueue.size()-1)
-			cout << ", ";
-	}
-	cout << ">" << '\n';
-}
-
-// do we have enough of chemical to form complete reaction
-bool stoichiometric(const react &reaction, const chemical &chem) {
-	return abs(chem.count) >= reaction.output.count;
-}
-
-// are any of the current reactions available stoichiometric?
-size_t getStoichiometric(vector<chemical> chemQueue, map<string, react> &reactions) {
-	for (auto i=0; i < chemQueue.size(); i++)
-		if (stoichiometric(reactions[chemQueue[i].name], chemQueue[i]))
-			return i;
-
-	return -1;
-}
-
-size_t getOreCost(map<string, react> &reactions, const string &chem) {
-	vector<chemical> chemQueue;
-
-	// initialize queue w/ first reaction
-	chemical startingChem = { chem, 1 };
-	chemQueue.push_back(startingChem);
-
-	vector<chemical> wasted;
-
-	auto ore = 0;
-	while (!chemQueue.empty()) {
-		//printQueue(chemQueue);
-
-		// pop chemical off of queue
-		auto nextChemical = getStoichiometric(chemQueue, reactions);
-		chemical curChem;
-		bool stoich = true;
-
-		if (nextChemical == -1) {
-			curChem = chemQueue.back();
-			chemQueue.pop_back();
-			stoich = false;
+		if (curChem.name == "ORE") {
+			chemical &extraOre = extraChems["ORE"];
+			u64 extraUsed = min(curChem.count, extraOre.count);
+			curChem.count -= extraUsed;
+			oreCount += curChem.count;
 		} else {
-			curChem = chemQueue[nextChemical];
-			chemQueue.erase(chemQueue.begin() + nextChemical);
-		}
-		
-		// get reaction for current chemical
-		react curReact = reactions[curChem.name];
+			chemical &extra = extraChems[curChem.name];
+			u64 extraUsed = min(curChem.count, extra.count);
+			curChem.count -= extraUsed;
+			extra.count -= extraUsed;
 
-		// do different things depending on if we met conditions for a stoichiometric reaction
-		if (!stoich) {
-			// check if we wasted chemical when we mightve shouldnt have, and recover from that possibility
-			bool stopEarly = false;
-			for (auto i=0; i < wasted.size(); i++) {
-				if (wasted[i].name == curChem.name && sameSign(wasted[i].count, curChem.count)) {
-					// re-add wasted element to queue
-					int newCount = wasted[i].count + curChem.count;
-					chemical toAdd = { curChem.name, newCount };
+			if (curChem.count > 0) {
+				react &reaction = reactions[curChem.name];
+				u64 numReactions = (curChem.count - 1) / reaction.output.count + 1;
+				extra.count = reaction.output.count * numReactions - curChem.count;
 
-					cout << '\n';
-					printQueue(chemQueue);
-					//printQueue(wasted);
-					cout << "Current: " << curChem << '\n';
-					cout << "Wasted: " << wasted[i] << '\n';
-					cout << "New: " << toAdd << '\n';
-
-					// still not enough for a reaction or just as much, so dont actually re-add to queue
-					if (newCount > 0 && newCount <= curReact.output.count) {
-						cout << "Still Wasted" << '\n';
-						wasted[i].count = newCount;
-						stopEarly = true;
-						continue;
-					}
-
-					queueInsert(chemQueue, toAdd);
-
-					// undo by adding negative chemicals, dirty trick
-					for (auto inputChem : curReact.inputs) {
-						if (inputChem.name == "ORE") {
-							ore -= inputChem.count;
-							continue;
-						}
-
-						chemical negChem = { inputChem.name, -inputChem.count };
-						queueInsert(chemQueue, negChem);
-					}
-
-					stopEarly = true;
-
-					// remove chemical from wasted list
-					wasted.erase(wasted.begin() + i);
-					printQueue(chemQueue);
-					//printQueue(wasted);
+				for (auto &inputChem : reaction.inputs) {
+					chemical toAdd = { inputChem.name, inputChem.count * numReactions };
+					neededChems.push_back(toAdd);
 				}
-			}
-
-			// we might not have to waste this chemical anymore
-			if (stopEarly)
-				continue;
-
-			// have to waste some of the chemical
-			wasted.push_back(curChem);
-
-			// handle negative reactions
-			int modifier = 1;
-			if (curChem.count < 0)
-				modifier = -1;
-
-			for (auto inputChem : curReact.inputs) {
-				inputChem.count *= modifier;
-
-				if (inputChem.name == "ORE") {
-					ore += inputChem.count;
-					continue;
-				}
-
-				queueInsert(chemQueue, inputChem);
-			}
-		} else {
-			int newCount = abs(curChem.count) - curReact.output.count;
-
-			int modifier = 1;
-			if (curChem.count < 0)
-				modifier = -1;
-
-			// add remainder back to queue
-			if (newCount != 0) {
-				chemical toAdd = { curChem.name, newCount*modifier };
-				queueInsert(chemQueue, toAdd);
-			}
-
-			// add reaction elements to queue
-			for (const auto &inputChem : curReact.inputs) {
-				if (inputChem.name == "ORE") {
-					ore += inputChem.count*modifier;
-					continue;
-				}
-
-				chemical toAdd = { inputChem.name, inputChem.count*modifier };
-				queueInsert(chemQueue, toAdd);
 			}
 		}
 	}
 
-	return ore;
+	return oreCount;
 }
 
-void part1(const string &filename) {
+unordered_map<string, react> loadReactions(const string &filename) {
 	ifstream in(filename);
 
-	// collection of reactions, accessible by reaction output chemical name
-	map<string, react> reactions;
+	unordered_map<string, react> reactions;
 
 	// parse reactions
 	string reaction;
@@ -247,12 +95,47 @@ void part1(const string &filename) {
 		reactions[toAdd.output.name] = toAdd;
 	}
 
-	auto oreCount = getOreCost(reactions, "FUEL");
-	cout << oreCount << '\n';
+	return reactions;
+}
+
+void part1(unordered_map<string, react> reactions) {
+	unordered_map<string, chemical> extraChems;
+	cout << oreCost(reactions, extraChems, 1) << '\n';
+}
+
+void part2(unordered_map<string, react> reactions) {
+	unordered_map<string, chemical> extraChems;
+
+	u64 orePerFuel = oreCost(reactions, extraChems, 1);
+	u64 fuelProduced = 1;
+
+	if (extraChems.find("FUEL") != extraChems.end()) {
+		fuelProduced += extraChems["FUEL"].count;
+		extraChems.erase("FUEL");
+	}
+
+	u64 producedFuelMultiplier = fuelProduced;
+
+	extraChems["ORE"].count = 1'000'000'000'000 - orePerFuel;
+
+	while (true) {
+		u64 producableFuel = max(1ULL, extraChems["ORE"].count / orePerFuel * producedFuelMultiplier);
+		u64 requiredOre = oreCost(reactions, extraChems, producableFuel);
+
+		if (requiredOre != 0) {
+			cout << fuelProduced << '\n';
+			return;
+		}
+
+		fuelProduced += producableFuel;
+	}
 }
 
 int main() {
-	part1("input");
+	unordered_map<string, react> reactions(loadReactions("input"));
+	
+	part1(reactions);
+	part2(reactions);
 
 	return 0;
 }
